@@ -4,16 +4,16 @@
   "Return string with trailing newline stripped."
   (replace-regexp-in-string "\n$" "" string))
 
-(defun devhelp-current-word ()
-  "Return the word at the point."
-  ; word-at-point includes properties, lame.
-  (let ((bounds (bounds-of-thing-at-point 'word)))
+(defun devhelp-current-symbol ()
+  "Return the symbol at the point."
+  ; thing-at-point includes properties, lame.
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
     (if bounds
         (buffer-substring-no-properties (car bounds) (cdr bounds)))))
 
 (defun devhelp-read-query ()
   "Read a search query from the minibuffer."
-  (let ((default (devhelp-current-word)))
+  (let ((default (devhelp-current-symbol)))
     (read-string (if default
                      (format "Devhelp query (%s): " default)
                    "Devhelp query: ")
