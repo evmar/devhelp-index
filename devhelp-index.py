@@ -52,6 +52,8 @@ def process(path):
 
             if word.endswith('()'):
                 word = word[:-2]
+            if word.startswith('std::'):
+                word = word[5:]
             # XXX check word is only ascii
             yield word, os.path.normpath(os.path.join(basedir, attrs['link']))
         elif attrs['type'] in ('', 'property', 'signal'):
