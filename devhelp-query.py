@@ -27,7 +27,7 @@ def main():
 
     if result is None:
         return 1
-    print index.GTK_DOC_PATH + result
+    print result
     return 0
 
 if __name__ == '__main__':

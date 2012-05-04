@@ -5,19 +5,23 @@ import glob
 import logging
 import os
 import xml.etree.ElementTree as ET
+import re
 import sys
 
 CACHE_PATH = os.environ.get('XDG_CACHE_HOME', os.path.expanduser('~/.cache'))
 DB_PATH = os.path.join(CACHE_PATH, 'devhelp-index.bz2')
-GTK_DOC_PATH = '/usr/share/gtk-doc/html/'
 
 def devhelp_tag(name):
     return '{http://www.devhelp.net/book}' + name
 
 def process(path):
     tree = ET.parse(path)
+
+    book = tree.getroot()
+    basedir = book.attrib.get('base', os.path.dirname(path))
+
     functions = tree.find(devhelp_tag('functions'))
-    for keyword in functions.iter(devhelp_tag('keyword')):
+    for keyword in functions.getiterator(devhelp_tag('keyword')):
         KEEP = (
             'constant',
             'enum',
@@ -30,18 +34,26 @@ def process(path):
             )
         attrs = keyword.attrib
         if attrs['type'] in KEEP:
+            if attrs['link'] == '404':
+                continue
+
             words = attrs['name'].split()
+
+            # Drop e.g. operator[].
+            if filter(lambda w: re.search(r'\boperator\b', w), words):
+                continue
+
             strip = ('()', 'enum', 'struct', 'union')
             words = filter(lambda w: w not in strip, words)
             if len(words) != 1:
-                logging.warning('unhandled: ' + str(attrs))
+                logging.warning('unhandled name: ' + str(attrs))
                 continue
             word = words[0]
 
             if word.endswith('()'):
                 word = word[:-2]
             # XXX check word is only ascii
-            yield word, attrs['link']
+            yield word, os.path.normpath(os.path.join(basedir, attrs['link']))
         elif attrs['type'] in ('', 'property', 'signal'):
             pass
         else:
@@ -50,19 +62,20 @@ def process(path):
 def build_index(verbose=True):
     keyvals = []
 
-    for path in glob.glob(GTK_DOC_PATH + '*/*.devhelp2'):
+    gtk_docs = glob.glob('/usr/share/gtk-doc/html/*/*.devhelp2')
+    books = glob.glob('/usr/share/devhelp/books/*/*.devhelp2')
+    for path in gtk_docs + books:
         if verbose:
             print >>sys.stderr, '*', path
-        dir = os.path.dirname(path[len(GTK_DOC_PATH):])
         for kw, link in process(path):
-            link = os.path.join(dir, link)
             keyvals.append((kw, link))
 
     keyvals.sort()
 
-    with bz2.BZ2File(DB_PATH, 'w') as f:
-        for kw, link in keyvals:
-            print >>f, '%s %s' % (kw, link)
+    f = bz2.BZ2File(DB_PATH, 'w')
+    for kw, link in keyvals:
+        print >>f, '%s %s' % (kw, link)
+    f.close()
 
 def get_or_rebuild_index(verbose=True):
     if not os.path.exists(DB_PATH):
